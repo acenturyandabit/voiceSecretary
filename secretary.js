@@ -1,45 +1,44 @@
+var secretary;
+
 function _secretary(cln) {
     let me = this;
     this.cln = cln;
     this.uid = Date.now();
     let interimHolder = document.createElement("p");
+    this.vocoder = new _vocoder();
+    this.vocoder.on("final",(result)=>{
+        me.cln.doc(String(Date.now())).set({
+            uid: me.uid,
+            text: result
+        });
+    })
+    this.vocoder.on("interim",(result)=>{
+        interimHolder.innerText = result;
+    })
     document.body.appendChild(interimHolder);
     interimHolder.style.color = "green";
     this.cln.onSnapshot((shot) => {
         shot.docChanges().forEach((c) => {
+            let data;
             switch (c.type) {
                 case "added":
-                    let data = c.doc.data();
+                    data = c.doc.data();
                     pp = document.createElement("p");
-                    pp.innerHTML = `<em>` + data.uid + `</em>:` + data.text;
+                    pp.classList.add(c.doc.id);
+                    pp.innerHTML = `<em>` + data.uid + `</em>:` + data.text+ `<em class="date">` + (new Date(Number(c.doc.id))).toLocaleString() + `</em>`;
                     document.body.appendChild(pp);
+                    break;
+                case "changed":
+                    data=c.doc.data();
+                    pp=document.getElementsByClassName(c.doc.id)[0];
+                    pp.innerHTML = `<em>` + data.uid + `</em>:` + data.text + `<em class="date">` + (new Date(Number(c.doc.id))).toLocaleString() + `</em>`;
                     break;
             }
         })
     });
-    window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-    let recognition = new window.SpeechRecognition();
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 10;
-    recognition.continuous = true;
-
-    recognition.onresult = (event) => {
-        let interimTranscript = '';
-        for (let i = event.resultIndex, len = event.results.length; i < len; i++) {
-            let transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                me.cln.doc(String(Date.now())).set({
-                    uid: me.uid,
-                    text: transcript
-                });
-                recognition.start();
-            } else {
-                interimTranscript += transcript;
-            }
-        }
-        interimHolder.innerText = interimTranscript;
-    }
-    recognition.start();
+    $("#uid").on("change",(e)=>{
+        me.uid=e.currentTarget.value;
+    })
 }
 
 
@@ -53,11 +52,11 @@ $(() => {
     fireman = new _fireman({
         documentQueryKeyword: "room",
         load: (doc, id) => {
-            let s = new _secretary(doc.collection('messages'));
+            secretary = new _secretary(doc.collection('messages'));
         },
         autocreate: true,
         makeNewDocument: function (doc, id) {
-            let s = new _secretary(doc.collection('messages'));
+            secretary = new _secretary(doc.collection('messages'));
         },
         passwall: true,
         autopass: true,
